@@ -1,0 +1,15 @@
+%% -*- mode: erlang -*-
+%% ex: ft=erlang ts=2 sw=2 et
+{application, ecli,
+ [
+  {description, "Erlang Command Line Toolkit"},
+  {vsn, git},
+  {registered, []},
+  {applications, 
+   [
+    kernel,
+    stdlib
+   ]},
+  {mod, { ecli_app, []}},
+  {env, []}
+ ]}.
