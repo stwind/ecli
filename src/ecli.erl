@@ -108,7 +108,9 @@ parse_args(Spec, Args) ->
     end.
 
 run({_, _, {Mod, Fun}, _}, Opts) ->
-    Mod:Fun(Opts).
+    Mod:Fun(Opts);
+run({_, _, Mod, _}, Opts) ->
+    Mod:run(Opts).
 
 val(Key, Vals) ->
     proplists:get_value(Key, Vals).
