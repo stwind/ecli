@@ -3,6 +3,14 @@
 -export([start/2]).
 -export([binding/2]).
 -export([opt/2]).
+-export([opt/3]).
+
+-export([halt_with/1]).
+-export([halt_with/2]).
+-export([halt_with/3]).
+
+-export([connect_node/2]).
+-export([wait_for/1]).
 
 -define(PRINT(Fmt), io:format(Fmt)).
 -define(PRINT(Fmt, Args), io:format(Fmt, Args)).
@@ -44,8 +52,34 @@ start(Args, Spec) ->
 binding(Key, #args{bindings = Bindings}) ->
     val(Key, Bindings).
 
-opt(Key, #args{opts = Opts}) ->
-    val(Key, Opts).
+opt(Key, Opts) ->
+    opt(Key, Opts, undefined).
+
+opt(Key, #args{opts = Opts}, Default) ->
+    val(Key, Opts, Default).
+
+halt_with(Code) ->
+    halt(Code).
+
+halt_with(String, Args) ->
+    halt_with(String, Args, 1).
+
+halt_with(String, Args, Code) ->
+    ?PRINT(String, Args),
+    halt(Code).
+
+connect_node(Name, Cookie) ->
+    {ThisNode, Mode} = append_node_suffix(to_string(Name), "_maint_"),
+    {ok, _} = net_kernel:start([ThisNode, Mode]),
+    erlang:set_cookie(node(), Cookie),
+    node().
+
+wait_for(Pid) ->
+    Mref = erlang:monitor(process, Pid),
+    receive
+        {'DOWN', Mref, _, _, _} ->
+            ok
+    end.
 
 %% ===================================================================
 %% Public
@@ -90,11 +124,9 @@ parse_args(Spec, Args) ->
     end.
 
 run({_, _, {Mod, Fun}, _}, Opts) ->
-    Mod:Fun(Opts).
-
-halt_with(String, Args, Code) ->
-    ?PRINT(String, Args),
-    halt(Code).
+    Mod:Fun(Opts);
+run({_, _, Mod, _}, Opts) ->
+    Mod:run(Opts).
 
 val(Key, Vals) ->
     proplists:get_value(Key, Vals).
@@ -161,7 +193,7 @@ usage_spec_lines([Opt | Rest], PrevMax, Acc) ->
     {Max, ColWidth} = max_opt_len({OptionText, HelpText}, PrevMax),
     usage_spec_lines(Rest, Max, [ColWidth | Acc]);
 usage_spec_lines([], Max, Acc) ->
-    {Max, Acc}.
+    {Max, lists:reverse(Acc)}.
 
 max_opt_len({OptText, HelpText}, PrevMax) ->
     OptLen = length(OptText),
@@ -285,3 +317,13 @@ consult_conf_file(File, Opts0) ->
       fun({K, V}, Acc) -> 
               lists:keystore(K, 1, Acc, {K, V})
       end, Opts0, Configs).
+
+append_node_suffix(Name, Suffix) ->
+    case string:tokens(Name, "@") of
+        [Node, Host] ->
+            {list_to_atom(lists:concat([Node, Suffix, os:getpid(), "@", Host])), 
+             longnames};
+        [Node] ->
+            {list_to_atom(lists:concat([Node, Suffix, os:getpid()])),
+             shortnames}
+    end.
