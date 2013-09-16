@@ -50,7 +50,7 @@ binding(Key, #args{bindings = Bindings}) ->
     val(Key, Bindings).
 
 opt(Key, Opts) ->
-    val(Key, Opts).
+    opt(Key, Opts, undefined).
 
 opt(Key, #args{opts = Opts}, Default) ->
     val(Key, Opts, Default).
