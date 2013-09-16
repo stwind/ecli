@@ -25,13 +25,17 @@
 start(Args, Spec) ->
     {Targets, Args1} = targets(Args, []),
     case match_cmd(val(commands, Spec), Targets, []) of
-        {ok, Fun, CmdSpec, Bindings} ->
-            Opts = parse_args(CmdSpec, Args1),
-            run(Fun, #args{bindings = Bindings, opts = Opts});
+        {ok, {_,_,_,CmdSpec} = Cmd, Bindings, Acc} ->
+            Opts = parse_args([spec_help() | CmdSpec], Args1),
+            maybe_cmd_usage(Opts, Spec, Cmd, Acc),
+            run(Cmd, #args{bindings = Bindings, opts = Opts});
         {nomatch, Cmd, Acc} ->
             cmd_usage(Spec, Cmd, Acc);
         {nomatch, []} ->
-            usage(Spec, [spec_help() | spec_default()], []);
+            CmdSpec = [spec_help() | spec_default()],
+            Opts = parse_args(CmdSpec, Args1),
+            maybe_usage_ver(Opts, Spec),
+            usage(Spec, CmdSpec, []);
         {nomatch, Acc} ->
             usage(Spec, [], Acc)
     end.
@@ -55,10 +59,10 @@ targets([Cmd | Rest], Cmds) ->
 
 match_cmd([], _, Acc) ->
     {nomatch, lists:reverse(Acc)};
-match_cmd([{Sub, Binds, Fun, Spec} = CmdSpec | _], [Sub | Rest], Acc) ->
+match_cmd([{Sub, Binds, _, _} = CmdSpec | _], [Sub | Rest], Acc) ->
     case match_bind(Binds, Rest, []) of
         {ok, Bindings} ->
-            {ok, Fun, Spec, Bindings};
+            {ok, CmdSpec, Bindings, Acc};
         nomatch ->
             {nomatch, CmdSpec, lists:reverse(Acc)}
     end;
@@ -84,7 +88,7 @@ parse_args(Spec, Args) ->
             ?HALT("Invalid option sequence given: ~w~n", [Error])
     end.
 
-run({Mod, Fun}, Opts) ->
+run({_, _, {Mod, Fun}, _}, Opts) ->
     Mod:Fun(Opts).
 
 halt_with(String, Args, Code) ->
@@ -112,6 +116,18 @@ usage(Spec, CmdSpec, Acc) ->
 usage_cmd_line(Spec, Args) ->
     Script = val(script, Spec, "undef_script_name"),
     ?PRINT("Usage: ~s ~s [options]~n~n", [Script, lists:flatten(Args)]).
+
+maybe_cmd_usage(Opts, Spec, Cmd, Acc) ->
+    case lists:member(help, Opts) of
+        true -> cmd_usage(Spec, Cmd, Acc);
+        false -> nop
+    end.
+
+maybe_usage_ver(Opts, Spec) ->
+    case lists:member(version, Opts) of
+        true -> usage_ver(Spec);
+        false -> nop
+    end.
 
 cmd_usage(Spec, {Sub, Binds, _, CmdSpec}, Acc) ->
     Binds1 = [["<",to_string(B), ">"] || B <- Binds],
@@ -162,10 +178,11 @@ usage_help_text({_Name, _Short, _Long, {_ArgType, ArgValue}, [_ | _] = Help}) ->
 usage_help_text({_Name, _Short, _Long, _ArgSpec, Help}) ->
     Help.
 
-%usage_ver(Spec) ->
-    %Script = val(script, Spec, "undef_script_name"),
-    %Ver = val(vsn, Spec, "undef_script_ver"),
-    %?PRINT("~s ~s~n", [Script, Ver]).
+usage_ver(Spec) ->
+    Script = val(script, Spec, "undef_script_name"),
+    Ver = val(vsn, Spec, "undef_script_ver"),
+    ?PRINT("~s ~s~n", [Script, Ver]),
+    halt(0).
 
 get_subcmds(Cmds, Acc) ->
     case g_subcmds(Cmds, Acc) of
