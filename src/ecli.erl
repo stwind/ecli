@@ -54,8 +54,8 @@ opt(Key, #args{opts = Opts}) ->
 halt_with(Code) ->
     halt(Code).
 
-halt_with(String, Code) ->
-    halt_with(String, [], Code).
+halt_with(String, Args) ->
+    halt_with(String, Args, 1).
 
 halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
