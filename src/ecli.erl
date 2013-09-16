@@ -28,11 +28,8 @@ start(Args, Spec) ->
         {ok, Fun, CmdSpec, Bindings} ->
             Opts = parse_args(CmdSpec, Args1),
             run(Fun, #args{bindings = Bindings, opts = Opts});
-        {nomatch, {_,_,_,CmdSpec} = Cmd, Acc} ->
-            CmdSpec1 = [spec_help() | CmdSpec],
-            Opts = parse_args(CmdSpec1, Args1),
-            maybe_cmd_usage(Opts, Spec, Cmd, Acc),
-            usage(Spec, CmdSpec1, Acc);
+        {nomatch, Cmd, Acc} ->
+            cmd_usage(Spec, Cmd, Acc);
         {nomatch, []} ->
             usage(Spec, [spec_help() | spec_default()], []);
         {nomatch, Acc} ->
@@ -58,7 +55,7 @@ targets([Cmd | Rest], Cmds) ->
 
 match_cmd([], _, Acc) ->
     {nomatch, lists:reverse(Acc)};
-match_cmd([{Sub, Binds, Fun, Spec} = CmdSpec | Rest], [Sub | Rest], Acc) ->
+match_cmd([{Sub, Binds, Fun, Spec} = CmdSpec | _], [Sub | Rest], Acc) ->
     case match_bind(Binds, Rest, []) of
         {ok, Bindings} ->
             {ok, Fun, Spec, Bindings};
@@ -115,12 +112,6 @@ usage(Spec, CmdSpec, Acc) ->
 usage_cmd_line(Spec, Args) ->
     Script = val(script, Spec, "undef_script_name"),
     ?PRINT("Usage: ~s ~s [options]~n~n", [Script, lists:flatten(Args)]).
-
-maybe_cmd_usage(Opts, Spec, Cmd, Acc) ->
-    case lists:member(help, Opts) of
-        true -> cmd_usage(Spec, Cmd, Acc);
-        false -> ok
-    end.
 
 cmd_usage(Spec, {Sub, Binds, _, CmdSpec}, Acc) ->
     Binds1 = [["<",to_string(B), ">"] || B <- Binds],
