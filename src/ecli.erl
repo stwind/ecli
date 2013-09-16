@@ -4,6 +4,10 @@
 -export([binding/2]).
 -export([opt/2]).
 
+-export([halt_with/1]).
+-export([halt_with/2]).
+-export([halt_with/3]).
+
 -define(PRINT(Fmt), io:format(Fmt)).
 -define(PRINT(Fmt, Args), io:format(Fmt, Args)).
 
@@ -46,6 +50,16 @@ binding(Key, #args{bindings = Bindings}) ->
 
 opt(Key, #args{opts = Opts}) ->
     val(Key, Opts).
+
+halt_with(Code) ->
+    halt(Code).
+
+halt_with(String, Code) ->
+    halt_with(String, [], Code).
+
+halt_with(String, Args, Code) ->
+    ?PRINT(String, Args),
+    halt(Code).
 
 %% ===================================================================
 %% Public
@@ -91,10 +105,6 @@ parse_args(Spec, Args) ->
 
 run({_, _, {Mod, Fun}, _}, Opts) ->
     Mod:Fun(Opts).
-
-halt_with(String, Args, Code) ->
-    ?PRINT(String, Args),
-    halt(Code).
 
 val(Key, Vals) ->
     proplists:get_value(Key, Vals).
