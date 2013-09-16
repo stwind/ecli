@@ -9,6 +9,8 @@
 -export([halt_with/2]).
 -export([halt_with/3]).
 
+-export([wait_for/1]).
+
 -define(PRINT(Fmt), io:format(Fmt)).
 -define(PRINT(Fmt, Args), io:format(Fmt, Args)).
 
@@ -64,6 +66,13 @@ halt_with(String, Args) ->
 halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
     halt(Code).
+
+wait_for(Pid) ->
+    Mref = erlang:monitor(process, Pid),
+    receive
+        {'DOWN', Mref, _, _, _} ->
+            ok
+    end.
 
 %% ===================================================================
 %% Public
