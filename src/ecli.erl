@@ -161,7 +161,7 @@ usage_spec_lines([Opt | Rest], PrevMax, Acc) ->
     {Max, ColWidth} = max_opt_len({OptionText, HelpText}, PrevMax),
     usage_spec_lines(Rest, Max, [ColWidth | Acc]);
 usage_spec_lines([], Max, Acc) ->
-    {Max, Acc}.
+    {Max, lists:reverse(Acc)}.
 
 max_opt_len({OptText, HelpText}, PrevMax) ->
     OptLen = length(OptText),
