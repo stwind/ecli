@@ -9,6 +9,7 @@
 -export([halt_with/2]).
 -export([halt_with/3]).
 
+-export([connect_node/2]).
 -export([wait_for/1]).
 
 -define(PRINT(Fmt), io:format(Fmt)).
@@ -66,6 +67,12 @@ halt_with(String, Args) ->
 halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
     halt(Code).
+
+connect_node(Name, Cookie) ->
+    {ThisNode, Mode} = append_node_suffix(to_string(Name), "_maint_"),
+    {ok, _} = net_kernel:start([ThisNode, Mode]),
+    erlang:set_cookie(node(), Cookie),
+    node().
 
 wait_for(Pid) ->
     Mref = erlang:monitor(process, Pid),
@@ -310,3 +317,13 @@ consult_conf_file(File, Opts0) ->
       fun({K, V}, Acc) -> 
               lists:keystore(K, 1, Acc, {K, V})
       end, Opts0, Configs).
+
+append_node_suffix(Name, Suffix) ->
+    case string:tokens(Name, "@") of
+        [Node, Host] ->
+            {list_to_atom(lists:concat([Node, Suffix, os:getpid(), "@", Host])), 
+             longnames};
+        [Node] ->
+            {list_to_atom(lists:concat([Node, Suffix, os:getpid()])),
+             shortnames}
+    end.
