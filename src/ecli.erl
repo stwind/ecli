@@ -27,8 +27,9 @@ start(Args, Spec) ->
     case match_cmd(val(commands, Spec), Targets, []) of
         {ok, {_,_,_,CmdSpec} = Cmd, Bindings, Acc} ->
             Opts = parse_args([spec_help() | CmdSpec], Args1),
-            maybe_cmd_usage(Opts, Spec, Cmd, Acc),
-            run(Cmd, #args{bindings = Bindings, opts = Opts});
+            Opts1 = maybe_conf_file(Opts, Spec),
+            maybe_cmd_usage(Opts1, Spec, Cmd, Acc),
+            run(Cmd, #args{bindings = Bindings, opts = Opts1});
         {nomatch, Cmd, Acc} ->
             cmd_usage(Spec, Cmd, Acc);
         {nomatch, []} ->
@@ -259,3 +260,28 @@ to_string(Value) ->
 usage_help(Spec) ->
     Script = val(script, Spec, "undef_script_name"),
     ?PRINT("For help on any individual command run `~s COMMAND -h`~n", [Script]).
+
+maybe_conf_file(Opts0, Spec) ->
+    case val(config_file, Spec) of
+        undefined ->
+            Opts0;
+        File ->
+            consult_conf_file(File, Opts0)
+    end.
+
+consult_conf_file(File, Opts0) ->
+    Configs = case filelib:is_regular(File) of
+                true ->
+                    case file:consult(File) of
+                        {ok, Terms} ->
+                            Terms;
+                        Other ->
+                            ?HALT("Failed to load ~s: ~p\n", [File, Other])
+                    end;
+                false ->
+                    []
+            end,
+    lists:foldl(
+      fun({K, V}, Acc) -> 
+              lists:keystore(K, 1, Acc, {K, V})
+      end, Opts0, Configs).
