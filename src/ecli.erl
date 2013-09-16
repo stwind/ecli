@@ -3,6 +3,7 @@
 -export([start/2]).
 -export([binding/2]).
 -export([opt/2]).
+-export([opt/3]).
 
 -export([halt_with/1]).
 -export([halt_with/2]).
@@ -48,8 +49,11 @@ start(Args, Spec) ->
 binding(Key, #args{bindings = Bindings}) ->
     val(Key, Bindings).
 
-opt(Key, #args{opts = Opts}) ->
+opt(Key, Opts) ->
     val(Key, Opts).
+
+opt(Key, #args{opts = Opts}, Default) ->
+    val(Key, Opts, Default).
 
 halt_with(Code) ->
     halt(Code).
