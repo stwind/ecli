@@ -68,11 +68,17 @@ halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
     halt(Code).
 
-connect_node(Name, Cookie) ->
-    {ThisNode, Mode} = append_node_suffix(to_string(Name), "_maint_"),
+connect_node(Node, Cookie) ->
+            ?PRINT("fuck"),
+    {ThisNode, Mode} = append_node_suffix(to_string(Node), "_maint_"),
     {ok, _} = net_kernel:start([ThisNode, Mode]),
     erlang:set_cookie(node(), Cookie),
-    node().
+    case net_adm:ping(Node) of
+        pong ->
+            {ok, node()};
+        pang ->
+            {error, pang}
+    end.
 
 wait_for(Pid) ->
     Mref = erlang:monitor(process, Pid),
