@@ -95,7 +95,7 @@ targets([Cmd | Rest], Cmds) ->
 match_cmd([], _, Acc) ->
     {nomatch, lists:reverse(Acc)};
 match_cmd([{Sub, Binds, _, _} = CmdSpec | _], [Sub | Rest], Acc) ->
-    case match_bind(Binds, Rest, []) of
+    case match_bind(Binds, Rest, [{others, []}]) of
         {ok, Bindings} ->
             {ok, CmdSpec, Bindings, Acc};
         nomatch ->
@@ -108,6 +108,10 @@ match_cmd([_ | Rest], Targets, Acc) ->
 
 match_bind([], [], Bs) ->
     {ok, Bs};
+match_bind(['...' | _], [], Bs) ->
+    {ok, Bs};
+match_bind(['...' | _], Targets, Bs) ->
+    {ok, lists:keystore(others,1,Bs, {others, Targets})};
 match_bind([], _, _) ->
     nomatch;
 match_bind(_, [], _) ->
@@ -163,10 +167,17 @@ maybe_usage_ver(Opts, Spec) ->
     end.
 
 cmd_usage(Spec, {Sub, Binds, _, CmdSpec}, Acc) ->
-    Binds1 = [["<",to_string(B), ">"] || B <- Binds],
+    Binds1 = cmd_usage_binds(Binds, []),
     usage_cmd_line(Spec, [string:join(Acc ++ [Sub] ++ Binds1, " ")]),
     usage_spec(CmdSpec),
     halt(0).
+
+cmd_usage_binds([], Acc) ->
+    lists:reverse(Acc);
+cmd_usage_binds(['...' | _], Acc) ->
+    lists:reverse(["[...]" | Acc]);
+cmd_usage_binds([B | Bs], Acc) ->
+    cmd_usage_binds(Bs, [["<",to_string(B), ">"] | Acc]).
 
 usage_spec([]) ->
     ok;
