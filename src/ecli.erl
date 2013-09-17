@@ -69,7 +69,6 @@ halt_with(String, Args, Code) ->
     halt(Code).
 
 connect_node(Node, Cookie) ->
-            ?PRINT("fuck"),
     {ThisNode, Mode} = append_node_suffix(to_string(Node), "_maint_"),
     {ok, _} = net_kernel:start([ThisNode, Mode]),
     erlang:set_cookie(node(), Cookie),
