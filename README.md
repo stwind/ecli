@@ -70,7 +70,7 @@ you should have a spec like this:
      {msgs, $m, "msgs", {integer, 10}, "stop trace after this many msgs"},
      {proc, $p, "proc", {string, "all"}, "Erlang process all|pid()|atom(RegName)"}
     ]}
-  ]},
+  ]}
 ].
 ```
 
