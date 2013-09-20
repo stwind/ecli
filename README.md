@@ -30,7 +30,7 @@ Just call `ecli:start/2` in the escript entry function `main/1`, providing the c
 
 E.g.
 
-```
+```erlang
 -module(ectl).
 
 -export([main/1]).
@@ -44,7 +44,7 @@ spec() ->
 
 ### Command Specification
 
-For [ectl](https://github.com/stwind/ectl) example, given the following commands:
+Take [ectl](https://github.com/stwind/ectl) for example, given the following commands:
 
 ```
 ectl redbug <node> <pattern> [-c] [-m] [-t] [-p]
@@ -52,7 +52,7 @@ ectl ping <node> [-c]
 ```
 you should have a spec like this:
 
-```
+```erlang
 [
  {script, "ectl"},
  {vsn, "0.1.0"},
@@ -83,7 +83,7 @@ The elements are:
 
 Now let's look closed to the `commands`, here is the spec of command option:
 
-```
+```erlang
 -type spec() :: [option()].
 
 -type option() :: 
@@ -109,7 +109,7 @@ Now let's look closed to the `commands`, here is the spec of command option:
 
 Take the `ectl ping` command for example:
 
-```
+```erlang
 {"ping", [node], ectl_ping,
  [
   {cookie, $c, "cookie", string, "Erlang cookie to use"}.
@@ -135,13 +135,13 @@ The function to handle a command call takes on argument, with it you can query t
 
 E.g. calling:
 
-```
+```bash
 ectl ping my_node@localhost -c my_cookie
 ```
 
 In the handler function, values can be queried like this:
 
-```
+```erlang
 run(Opt) ->
 	"my_node@localhost" = ecli:binding(node, Opt),
 	"my_cookie" = ecli:opt(cookie, Opt).
@@ -153,7 +153,7 @@ If a command run match a subcommand, but dosen't match its argument, the usage o
 
 Running `ectl ping` will shows:
 
-```
+```bash
 Usage: ectl ping <node> [...] [options]
 
   -c, --cookie  Erlang cookie to use
@@ -161,7 +161,7 @@ Usage: ectl ping <node> [...] [options]
 
 Running `ectl redbug my_node@localhost` will shows:
 
-```
+```bash
 Usage: ectl redbug <node> <trace_pattern> [options]
 
   -c, --cookie  Erlang cookie to use
@@ -172,7 +172,7 @@ Usage: ectl redbug <node> <trace_pattern> [options]
 
 Running `ectl dummy` will shows:
 
-```
+```bash
 Usage: ectl  <command> [<arg>] [options]
 
   -h, --help     Print this help.
@@ -188,6 +188,6 @@ For help on any individual command run `ectl COMMAND -h`
 
 And finally running `ectl -v` will shows the script version provided:
 
-```
+```bash
 ectl 0.1.0
 ```
