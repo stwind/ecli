@@ -12,14 +12,31 @@
 -export([connect_node/2]).
 -export([wait_for/1]).
 
--define(PRINT(Fmt), io:format(Fmt)).
--define(PRINT(Fmt, Args), io:format(Fmt, Args)).
-
--define(HALT(Fmt), ?HALT(Fmt, [])).
--define(HALT(Fmt, Args), ?HALT(Fmt, Args, 1)).
--define(HALT(Fmt, Args, Code), halt_with(Fmt, Args, Code)).
+-include("ecli.hrl").
 
 -define(LINE_LENGTH, 75).
+
+-type spec() :: [option()].
+
+-type option() :: 
+        {script, string()} |
+        {vsn, string()} |
+        {config_file, string()} |
+        {commands, [command()]}.
+
+-type command() :: cmd_collection() | cmd_spec().
+
+-type cmd_collection() :: {cmd_name(), [command()]}.
+
+-type cmd_name() :: string().
+
+-type cmd_spec() :: {cmd_name(), [cmd_arg()], cmd_fun(), [cmd_opt()]}.
+
+-type cmd_arg() :: atom() | '...'.
+
+-type cmd_fun() :: {module(), atom()} | module().
+
+-type cmd_opt() :: getopt:option_spec().
 
 -record(args, {
           bindings = [] :: list({atom(), string()}),
@@ -30,6 +47,7 @@
 %% Public
 %% ===================================================================
 
+-spec start([string()], spec()) -> ok.
 start(Args, Spec) ->
     {Targets, Args1} = targets(Args, []),
     case match_cmd(val(commands, Spec), Targets, []) of
@@ -68,11 +86,16 @@ halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
     halt(Code).
 
-connect_node(Name, Cookie) ->
-    {ThisNode, Mode} = append_node_suffix(to_string(Name), "_maint_"),
+connect_node(Node, Cookie) ->
+    {ThisNode, Mode} = append_node_suffix(to_string(Node), "_maint_"),
     {ok, _} = net_kernel:start([ThisNode, Mode]),
     erlang:set_cookie(node(), Cookie),
-    node().
+    case net_adm:ping(Node) of
+        pong ->
+            {ok, node()};
+        pang ->
+            {error, pang}
+    end.
 
 wait_for(Pid) ->
     Mref = erlang:monitor(process, Pid),
@@ -95,7 +118,7 @@ targets([Cmd | Rest], Cmds) ->
 match_cmd([], _, Acc) ->
     {nomatch, lists:reverse(Acc)};
 match_cmd([{Sub, Binds, _, _} = CmdSpec | _], [Sub | Rest], Acc) ->
-    case match_bind(Binds, Rest, []) of
+    case match_bind(Binds, Rest, [{others, []}]) of
         {ok, Bindings} ->
             {ok, CmdSpec, Bindings, Acc};
         nomatch ->
@@ -108,6 +131,10 @@ match_cmd([_ | Rest], Targets, Acc) ->
 
 match_bind([], [], Bs) ->
     {ok, Bs};
+match_bind(['...' | _], [], Bs) ->
+    {ok, Bs};
+match_bind(['...' | _], Targets, Bs) ->
+    {ok, lists:keystore(others,1,Bs, {others, Targets})};
 match_bind([], _, _) ->
     nomatch;
 match_bind(_, [], _) ->
@@ -163,10 +190,17 @@ maybe_usage_ver(Opts, Spec) ->
     end.
 
 cmd_usage(Spec, {Sub, Binds, _, CmdSpec}, Acc) ->
-    Binds1 = [["<",to_string(B), ">"] || B <- Binds],
+    Binds1 = cmd_usage_binds(Binds, []),
     usage_cmd_line(Spec, [string:join(Acc ++ [Sub] ++ Binds1, " ")]),
     usage_spec(CmdSpec),
     halt(0).
+
+cmd_usage_binds([], Acc) ->
+    lists:reverse(Acc);
+cmd_usage_binds(['...' | _], Acc) ->
+    lists:reverse(["[...]" | Acc]);
+cmd_usage_binds([B | Bs], Acc) ->
+    cmd_usage_binds(Bs, [["<",to_string(B), ">"] | Acc]).
 
 usage_spec([]) ->
     ok;
