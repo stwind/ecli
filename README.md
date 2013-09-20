@@ -126,7 +126,7 @@ The tuple has four elements:
 To summarize:
 
 * running `ectl ping my_node@localhost` will call `ectl_ping:/run1`.
-* running `ectl redbug my_node@localhost "erlang:memory() -> return"` will call `ectl_redbug/run/1`.
+* running `ectl redbug my_node@localhost "erlang:memory() -> return"` will call `ectl_redbug:run/1`.
 * running `ectl dummy` will show usage info of `ectl`, since it dosen't match any command.
 
 #### Value Binding
