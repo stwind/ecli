@@ -81,7 +81,7 @@ The elements are:
 * `config_file`: a file from with to read options, so you don't have to provide them on command-line every call. Options in config file will always be override by the command-line ones.
 * `commands`: command options that Ecli will use to decide what function to call for a command invocation.
 
-Now let's look closed to the `commands`, here is the spec of command option:
+Now let's look closer to the `commands`, here is the spec of command option:
 
 ```erlang
 -type spec() :: [option()].
