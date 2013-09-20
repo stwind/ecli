@@ -7,7 +7,7 @@ With [Rebar](https://github.com/rebar/rebar/wiki/Rebar-commands)'s `escriptize` 
 
 Features:
 
-* [Subcommand](#subcommands)
+* [Subcommand](#subcommand)
 * Output Formatting
 
 ## Subcommand
