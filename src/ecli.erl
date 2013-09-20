@@ -16,6 +16,28 @@
 
 -define(LINE_LENGTH, 75).
 
+-type spec() :: [option()].
+
+-type option() :: 
+        {script, string()} |
+        {vsn, string()} |
+        {config_file, string()} |
+        {commands, [command()]}.
+
+-type command() :: cmd_collection() | cmd_spec().
+
+-type cmd_collection() :: {cmd_name(), [command()]}.
+
+-type cmd_name() :: string().
+
+-type cmd_spec() :: {cmd_name(), [cmd_arg()], cmd_fun(), [cmd_opt()]}.
+
+-type cmd_arg() :: atom() | '...'.
+
+-type cmd_fun() :: {module(), atom()} | module().
+
+-type cmd_opt() :: getopt:option_spec().
+
 -record(args, {
           bindings = [] :: list({atom(), string()}),
           opts = [] :: list({atom(), string()})
@@ -25,6 +47,7 @@
 %% Public
 %% ===================================================================
 
+-spec start([string()], spec()) -> ok.
 start(Args, Spec) ->
     {Targets, Args1} = targets(Args, []),
     case match_cmd(val(commands, Spec), Targets, []) of
