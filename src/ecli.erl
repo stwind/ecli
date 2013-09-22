@@ -11,6 +11,7 @@
 
 -export([connect_node/2]).
 -export([wait_for/1]).
+-export([output/3]).
 
 -include("ecli.hrl").
 
@@ -27,15 +28,10 @@
 -type command() :: cmd_collection() | cmd_spec().
 
 -type cmd_collection() :: {cmd_name(), [command()]}.
-
 -type cmd_name() :: string().
-
 -type cmd_spec() :: {cmd_name(), [cmd_arg()], cmd_fun(), [cmd_opt()]}.
-
 -type cmd_arg() :: atom() | '...'.
-
 -type cmd_fun() :: {module(), atom()} | module().
-
 -type cmd_opt() :: getopt:option_spec().
 
 -record(args, {
@@ -102,6 +98,14 @@ wait_for(Pid) ->
     receive
         {'DOWN', Mref, _, _, _} ->
             ok
+    end.
+
+output(Data, OutputOpts, Opts) ->
+    case opt(output, Opts) of
+        table ->
+            ecli_tbl:print(Data, OutputOpts);
+        _ ->
+            ?PRINT("~p~n",[Data])
     end.
 
 %% ===================================================================
@@ -337,16 +341,16 @@ maybe_conf_file(Opts0, Spec) ->
 
 consult_conf_file(File, Opts0) ->
     Configs = case filelib:is_regular(File) of
-                true ->
-                    case file:consult(File) of
-                        {ok, Terms} ->
-                            Terms;
-                        Other ->
-                            ?HALT("Failed to load ~s: ~p\n", [File, Other])
-                    end;
-                false ->
-                    []
-            end,
+                  true ->
+                      case file:consult(File) of
+                          {ok, Terms} ->
+                              Terms;
+                          Other ->
+                              ?HALT("Failed to load ~s: ~p\n", [File, Other])
+                      end;
+                  false ->
+                      []
+              end,
     lists:foldl(
       fun({K, V}, Acc) -> 
               lists:keystore(K, 1, Acc, {K, V})
