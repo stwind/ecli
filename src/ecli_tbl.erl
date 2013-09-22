@@ -166,23 +166,19 @@ do_print(#table{rows = Rows} = T) ->
     print_line_bottom(T),
     print_line_break().
 
-print_rows([Cells], #table{columns = Cols} = T) ->
-    lists:foreach(
-      fun({Cell, Col}) -> 
-              print_cell(to_l(Cell), Col, T)
-      end, lists:zip(Cells, Cols)),
-    ?PRINT("~ts",[c("right", T)]),
+print_rows([Cells], T) ->
+    print_cells(Cells, T),
     print_line_break();
-print_rows([Cells | Rs], #table{columns = Cols} = T) ->
-    lists:foreach(
-      fun({Cell, Col}) -> 
-              print_cell(to_l(Cell), Col, T)
-      end, lists:zip(Cells, Cols)),
-    ?PRINT("~ts",[c("right", T)]),
+print_rows([Cells | Rs], T) ->
+    print_cells(Cells, T),
     print_line_break(),
     print_line_mid(T),
     print_line_break(),
     print_rows(Rs, T).
+
+print_cells(Cells, #table{columns = Cols} = T) ->
+    [print_cell(to_l(Cell), Col, T) || {Cell, Col} <- lists:zip(Cells, Cols)],
+    ?PRINT("~ts",[c("right", T)]).
 
 print_line_top(T) -> print_line(line_chars(top, T), T).
 
