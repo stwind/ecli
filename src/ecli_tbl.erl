@@ -115,16 +115,17 @@ init_columns(#table{columns = Columns, heads = Heads} = T)
 init_columns(_) ->
     throw({error, invalid_columns}).
 
-init_column(I, #table{columns = Columns, rows = Rows}) ->
-    Col = ?nth(I, Columns),
-    init_col(Col, [lists:nth(I, Row) || Row <- Rows]).
+init_column(I, #table{columns = Cols, rows = Rows}) ->
+    init_col(?nth(I, Cols), [lists:nth(I, Row) || Row <- Rows]).
 
 init_col(Align, Vals) when is_atom(Align) ->
-    valid_col({Align, calc_vals_width(Vals), 0, 0});
+    valid_col({Align, calc_vals_width(Vals), 1, 1});
 init_col({Align, auto}, Vals) ->
-    valid_col({Align, calc_vals_width(Vals), 0, 0});
+    valid_col({Align, calc_vals_width(Vals), 1, 1});
 init_col({Align, Width}, _) ->
-    valid_col({Align, Width, 0, 0});
+    valid_col({Align, Width, 1, 1});
+init_col({Align, auto, PL, PR}, Vals) ->
+    valid_col({Align, calc_vals_width(Vals), PL, PR});
 init_col(Col, _) ->
     valid_col(Col).
 
@@ -133,7 +134,7 @@ valid_col(Col) when ?VALID_COL(Col) ->
 valid_col(Col) ->
     throw({error, {invalid_column, Col}}).
 
-col_width({_, W, _, _}) -> W.
+col_width({_, W, PL, PR}) -> W + PL + PR.
 
 calc_vals_width(Vals) ->
     lists:max([get_width(V) || V <- Vals]).
