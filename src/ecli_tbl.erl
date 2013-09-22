@@ -27,11 +27,20 @@
 -define(dup(N, C), lists:duplicate(N, C)).
 -define(pad(N), ?dup(N, $\s)).
 
+-define(VALID_COL(Col), 
+        is_tuple(Col),
+        tuple_size(Col) == 4,
+        is_atom(element(1, Col)),
+        is_integer(element(2, Col)),
+        element(2, Col) >= 2, %% minimum column width: 2 
+        is_integer(element(3, Col)),
+        is_integer(element(4, Col))).
+
 -type head() :: atom() | binary().
 
--type column() :: width() | 
-                  {width(), align()} | 
-                  {width(), align(), pad_left(), pad_right()}.
+-type column() :: align() | 
+                  {align(), width()} | 
+                  {align(), width(), pad_left(), pad_right()}.
 -type align() :: left | right | center.
 -type width() :: integer().
 -type pad_left() :: integer().
@@ -42,7 +51,7 @@
           width = 0 :: integer(),
           columns = [] :: [column()],
           heads = [] :: [head()],
-          truncate = "..." :: string(),
+          truncate = [8230] :: string(), %% "…"
           rows = []
          }).
 
@@ -57,7 +66,7 @@ print(Rows, Opts) ->
     Table3 = align_rows(Table2),
     Table4 = init_columns(Table3),
     Table5 = calc_width(Table4),
-    %print_info(Table5),
+    print_info(Table5),
     do_print(Table5).
 
 %% ===================================================================
@@ -76,7 +85,7 @@ init_opts([], Table) ->
     Table.
 
 init_rows(Rows, Table) ->
-    Rows1 = lists:map(fun(Row) -> [{to_b(K), V} || {K, V} <- Row] end, Rows),
+    Rows1 = [[{to_b(K), V} || {K, V} <- Row] || Row <- Rows],
     Table#table{rows = Rows1}.
 
 init_heads(#table{heads = [_|_] = Heads} = Table) ->
@@ -89,32 +98,40 @@ init_heads(#table{rows = Rows} = Table) ->
     Table#table{heads = lists:usort([to_b(H) || H <- Keys])}.
 
 align_rows(#table{heads = Heads, rows = Rows} = Table) ->
-    Rows1 = lists:map(fun(Row) -> align_row(Row, Heads) end, Rows),
+    Rows1 = [align_row(Row, Heads) || Row <- Rows],
     Table#table{rows = [[to_l(H) || H <- Heads] | Rows1]}.
 
 align_row(Row, Heads) ->
     [proplists:get_value(Key, Row, "") || Key <- Heads].
 
-init_columns(#table{columns = Columns, heads = Heads} = Table) 
+init_columns(#table{columns = [], heads = Heads} = T) ->
+    init_columns(T#table{columns = [left || _ <- Heads]});
+init_columns(#table{columns = Columns, heads = Heads} = T) 
   when length(Columns) == length(Heads) ->
-    Table#table{columns = [column(C) || C <- Columns]};
-init_columns(#table{rows = Rows} = Table) ->
-    Columns = lists:map(fun(Idx) ->  init_column(Idx, Rows) end, 
-                          lists:seq(1, length(hd(Rows)))),
-    Table#table{columns = [column(C) || C <- Columns]}.
+    Columns1 = [init_column(I, T) || I <- lists:seq(1, num_cols(T))],
+    T#table{columns = Columns1};
+init_columns(_) ->
+    throw({error, invalid_columns}).
 
-init_column(Idx, Rows) ->
-    column(calc_colwidth(Idx, Rows)).
+init_column(I, #table{columns = Columns, rows = Rows}) ->
+    Col = ?nth(I, Columns),
+    init_col(Col, [lists:nth(I, Row) || Row <- Rows]).
 
-column(Width) when is_integer(Width) ->
-    {Width, left, 0, 0};
-column({Width, Align}) ->
-    {Width, Align, 0, 0};
-column({_, _, _, _} = Col) ->
-    Col.
+init_col(Align, Vals) when is_atom(Align) ->
+    {Align, calc_vals_width(Vals), 0, 0};
+init_col({Align, Width}, _) ->
+    valid_col({Align, Width, 0, 0});
+init_col(Col, _) ->
+    valid_col(Col).
 
-calc_colwidth(Idx, Rows) ->
-    Vals = [lists:nth(Idx, Row) || Row <- Rows],
+valid_col(Col) when ?VALID_COL(Col) ->
+    Col;
+valid_col(Col) ->
+    throw({error, {invalid_column, Col}}).
+
+col_width({_, W, _, _}) -> W.
+
+calc_vals_width(Vals) ->
     lists:max([get_width(V) || V <- Vals]).
 
 %% TODO: handle unicode
@@ -123,8 +140,8 @@ get_width(Val) ->
 
 calc_width(#table{columns = Columns} = Table) ->
     Width = lists:foldl(
-              fun({W, _, _, _}, Acc) -> 
-                      W + Acc 
+              fun(Col, Acc) -> 
+                      col_width(Col) + Acc 
               end, length(Columns) + 1, Columns),
     Table#table{width = Width}.
 
@@ -132,16 +149,17 @@ calc_width(#table{columns = Columns} = Table) ->
 %% Drawing functions
 %% ===================================================================
 
-%print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
-    %?PRINT("columns: ~p~n", [Columns]),
-    %?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
-    %?PRINT("width: ~p~n", [Width]),
-    %[?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
+print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
+    ?PRINT("columns: ~p~n", [Columns]),
+    ?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
+    ?PRINT("width: ~p~n", [Width]),
+    [?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
 
 do_print(#table{rows = Rows} = T) ->
     print_line_top(T),
     print_line_break(),
     print_rows(Rows, T),
+    print_line_bottom(T),
     print_line_break().
 
 print_rows([Cells], #table{columns = Cols} = T) ->
@@ -150,8 +168,7 @@ print_rows([Cells], #table{columns = Cols} = T) ->
               print_cell(to_l(Cell), Col, T)
       end, lists:zip(Cells, Cols)),
     ?PRINT("~ts",[c("right", T)]),
-    print_line_break(),
-    print_line_bottom(T);
+    print_line_break();
 print_rows([Cells | Rs], #table{columns = Cols} = T) ->
     lists:foreach(
       fun({Cell, Col}) -> 
@@ -163,81 +180,78 @@ print_rows([Cells | Rs], #table{columns = Cols} = T) ->
     print_line_break(),
     print_rows(Rs, T).
 
-print_line_top(#table{width = Width} = T) ->
-    line({c("top",T),c("top-left",T),c("top-right",T),c("top-mid",T)},
-         {1, Width}, checkpoints(T)).
+print_line_top(T) -> print_line(line_chars(top, T), T).
 
-print_line_mid(#table{width = Width} = T) ->
-    line({c("mid",T),c("left-mid",T),c("right-mid",T),c("mid-mid",T)},
-         {1, Width}, checkpoints(T)).
+print_line_mid(T) -> print_line(line_chars(middle, T), T).
 
-print_line_bottom(#table{width = Width} = T) ->
-    line({c("bottom",T),c("bottom-left",T),c("bottom-right",T),c("bottom-mid",T)},
-         {1, Width}, checkpoints(T)).
+print_line_bottom(T) -> print_line(line_chars(bottom, T),T).
 
-print_cell(Cell, Col, T) ->
-    ?PRINT("~ts~ts", [c("left",T), fmt_cell(Cell, Col, T)]).
+print_line_break() -> ?PRINT("~n").
 
-fmt_cell(Cell, {Width, Align, PL, PR}, _) when length(Cell) =< Width  ->
-    {PadL, PadR} = calc_cell_pad(Cell, Width, Align),
-    ?pad(PadL + PL) ++ Cell ++ ?pad(PadR + PR);
-fmt_cell(Cell, {Width, _, PL, PR}, T) ->
-    ?pad(PL) ++ truncate(Cell, Width, T) ++ ?pad(PR).
+line_chars(top, T) ->
+    {c("top",T),c("top-left",T),c("top-right",T),c("top-mid",T)};
+line_chars(middle, T) ->
+    {c("mid",T),c("left-mid",T),c("right-mid",T),c("mid-mid",T)};
+line_chars(bottom, T) ->
+    {c("bottom",T),c("bottom-left",T),c("bottom-right",T),c("bottom-mid",T)}.
 
-print_line_break() ->
-    ?PRINT("~n").
+print_line(Chars, #table{width = Width} = T) ->
+    draw_line(Chars, {1, Width}, checkpoints(T)).
 
-checkpoints(#table{columns = Columns}) ->
-    {CheckPoints, _} = lists:foldl(
-      fun({W, _, _, _}, {CW, Acc}) -> 
-              P = W + Acc + 1,
-              {[P | CW], P}
-      end, {[], 1}, Columns),
-    lists:reverse(CheckPoints).
-
-line({_, Left, _, _} = Chars, {1, Width}, CheckPoints) ->
+draw_line({_, Left, _, _} = Chars, {1, Width}, CheckPoints) ->
     ?PRINT("~ts", [Left]),
-    line(Chars, {2, Width}, CheckPoints);
-line({_, _, Right, _}, {Width, Width}, _)  ->
+    draw_line(Chars, {2, Width}, CheckPoints);
+draw_line({_, _, Right, _}, {Width, Width}, _)  ->
     ?PRINT("~ts", [Right]);
-line({Line, _, _, Inter} = Chars, {Now, Width}, CheckPoints) ->
+draw_line({Line, _, _, Inter} = Chars, {Now, Width}, CheckPoints) ->
     case lists:member(Now, CheckPoints) of
         true -> ?PRINT("~ts", [Inter]);
         false -> ?PRINT("~ts", [Line])
     end,
-    line(Chars, {Now + 1, Width}, CheckPoints).
+    draw_line(Chars, {Now + 1, Width}, CheckPoints).
 
-to_b(V) when is_atom(V) ->
-    list_to_binary(atom_to_list(V));
-to_b(V) when is_list(V) ->
-    list_to_binary(V);
-to_b(V) when is_binary(V) ->
-    V.
+print_cell(Cell, Col, T) ->
+    ?PRINT("~ts~ts", [c("left",T), fmt_cell(Cell, Col, T)]).
 
-to_l(V) when is_float(V); is_integer(V) ->
-    mochinum:digits(V);
-to_l(V) when is_binary(V) ->
-    binary_to_list(V);
-to_l(V) when is_atom(V) ->
-    atom_to_list(V);
-to_l(V) when is_list(V) ->
-    V;
-to_l(_) ->
-    exit(badarg).
+fmt_cell(Cell, {Align, Width, PL, PR}, _) when length(Cell) =< Width ->
+    {PadL, PadR} = calc_cell_pad(Cell, Width, Align),
+    ?pad(PadL + PL) ++ Cell ++ ?pad(PadR + PR);
+fmt_cell(Cell, {_, Width, PL, PR}, T) ->
+    ?pad(PL) ++ truncate(Cell, Width, T) ++ ?pad(PR).
 
-c(C, #table{chars = Chars}) ->
-    proplists:get_value(C, Chars).
+checkpoints(#table{columns = Columns}) ->
+    {CheckPoints, _} = lists:foldl(
+      fun(Col, {CW, Acc}) -> 
+              P = col_width(Col) + Acc + 1,
+              {[P | CW], P}
+      end, {[], 1}, Columns),
+    lists:reverse(CheckPoints).
+
+to_b(V) when is_atom(V) -> list_to_binary(atom_to_list(V));
+to_b(V) when is_list(V) -> list_to_binary(V);
+to_b(V) when is_binary(V) -> V;
+to_b(_) -> exit(badarg).
+
+to_l(V) when is_float(V); is_integer(V) -> mochinum:digits(V);
+to_l(V) when is_binary(V) -> binary_to_list(V);
+to_l(V) when is_atom(V) -> atom_to_list(V);
+to_l(V) when is_list(V) -> V;
+to_l(_) -> exit(badarg).
+
+c(C, #table{chars = Chars}) -> proplists:get_value(C, Chars).
+
+num_cols(#table{heads = Heads}) -> length(Heads).
 
 calc_cell_pad(Cell, Width, left) ->
     {0, Width - length(Cell)};
 calc_cell_pad(Cell, Width, right) ->
     {Width - length(Cell), 0};
 calc_cell_pad(Cell, Width, center) ->
-    Diff = (Width - Cell) / 2,
+    Diff = (Width - length(Cell)) / 2,
     {mochinum:int_ceil(Diff), trunc(Diff)}.
 
 truncate(Cell, Width, #table{truncate = Trunc}) ->
-    do_trunc(Cell, {1, Width - length(Trunc)}, []) ++ Trunc.
+    do_trunc(Cell, {1, Width - length(Trunc) + 1}, []) ++ Trunc.
 
 do_trunc(_, {Width, Width}, Acc) ->
     lists:reverse(Acc);
