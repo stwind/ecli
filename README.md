@@ -5,16 +5,33 @@ With [Rebar](https://github.com/rebar/rebar/wiki/Rebar-commands)'s `escriptize` 
 
 **Ecli** is a library that help you to build more powerful escriptized command-line tool.
 
-Features:
+## Usage
 
-* [Subcommand](#subcommands)
-* Output Formatting
+Just add Ecli dep to you `rebar.config`:
 
-## Subcommand
+```erlang
+{deps, [
+    {ecli, ".*", 
+      {git, "https://github.com/stwind/ecli.git", {branch, "develop"}}}
+  ]}.
+```
+
+And include `ecli` and `getopt` in your escript:
+
+```erlang
+{escript_incl_apps, [ecli, getopt]}.
+```
+
+## Features:
+
+* [Subcommand](#subcommand)
+* [Output Formatting](#outputting)
+
+### Subcommand
 
 Instead of having a bunch of standalone escript file, it is always helpful to have a unified command line interface to a collection of commands. Just like [npm](https://npmjs.org/) or [vagrant](http://vagrantup.com). Ecli makes this easy.
 
-### Requirements 
+#### Requirements 
 
 Ecli supposes that your subcommnds are something like this:
 
@@ -24,7 +41,7 @@ SCRIPT [command …] [<arg>] [<option>]
 That is a command that has a script name `SCRIPT` followed by one or more `command`, then argument `arg`, and finally some `option`s. The order of `comamnd`, `arg` and `option` can not be arbitrary, in order to make parsing more easier.
 
 
-### Usage
+#### Usage
 
 Just call `ecli:start/2` in the escript entry function `main/1`, providing the command-line argumets `Args` and a subcommand spec.
 
@@ -42,7 +59,7 @@ spec() ->
 	%% describe below.
 ```
 
-### Command Specification
+#### Command Specification
 
 Take [ectl](https://github.com/stwind/ectl) for example, given the following commands:
 
@@ -70,7 +87,7 @@ you should have a spec like this:
      {msgs, $m, "msgs", {integer, 10}, "stop trace after this many msgs"},
      {proc, $p, "proc", {string, "all"}, "Erlang process all|pid()|atom(RegName)"}
     ]}
-  ]},
+  ]}
 ].
 ```
 
@@ -81,29 +98,21 @@ The elements are:
 * `config_file`: a file from with to read options, so you don't have to provide them on command-line every call. Options in config file will always be override by the command-line ones.
 * `commands`: command options that Ecli will use to decide what function to call for a command invocation.
 
-Now let's look closed to the `commands`, here is the spec of command option:
+Now let's look closer to the `commands`, here is the spec of command option:
 
 ```erlang
 -type spec() :: [option()].
-
 -type option() :: 
         {script, string()} |
         {vsn, string()} |
         {config_file, string()} |
         {commands, [command()]}.
-
 -type command() :: cmd_collection() | cmd_spec().
-
 -type cmd_collection() :: {cmd_name(), [command()]}.
-
 -type cmd_name() :: string().
-
 -type cmd_spec() :: {cmd_name(), [cmd_arg()], cmd_fun(), [cmd_opt()]}.
-
 -type cmd_arg() :: atom() | '...'.
-
 -type cmd_fun() :: {module(), atom()} | module().
-
 -type cmd_opt() :: getopt:option_spec().
 ```
 
@@ -190,4 +199,47 @@ And finally running `ectl -v` will shows the script version provided:
 
 ```bash
 ectl 0.1.0
+```
+
+### Outputting
+
+Most of times it would be nice to display the results in table format for better visualizaiton, or json format which could be consumed by programs like [jq](http://stedolan.github.io/jq/) at another end of pipe. 
+
+Ecli has builtin support for `table` format output, you can easily achieve this by adding an `output` option to your command.
+
+First include the `ecli.hrl` lib to your module:
+
+```erlang
+-include_lib("ecli/include/ecli.hrl").
+```
+
+then add `?OTP_OUTPUT` to your subcommand spec, here is example from `ectl ping`:
+
+```erlang
+{"ping", [node, '...'], ectl_ping,
+      [
+       {cookie, $c, "cookie", string, "Erlang cookie to use"},
+       ?OPT_OUTPUT
+      ]}
+```
+
+Now your command will have a `output` option: 
+
+```bash
+$ ./ectl ping
+Usage: ectl ping <node> [...] [options]
+
+  -c, --cookie  Erlang cookie to use
+  -o, --output  output format: table|json|plain [default: plain]
+```
+
+In your command handler function, use the `ecli:output/3` to output the results, here again is example from `ectl ping`:
+
+```bash
+$ ./ectl ping my_node@127.0.0.1 -c my_cookie -o table
+┌──────────────────────┬────────┐
+│ node                 │ result │
+├──────────────────────┼────────┤
+│ yunio_core@127.0.0.1 │ pang   │
+└──────────────────────┴────────┘
 ```
