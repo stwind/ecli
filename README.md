@@ -5,16 +5,33 @@ With [Rebar](https://github.com/rebar/rebar/wiki/Rebar-commands)'s `escriptize` 
 
 **Ecli** is a library that help you to build more powerful escriptized command-line tool.
 
-Features:
+## Usage
+
+Just add Ecli dep to you `rebar.config`:
+
+```erlang
+{deps, [
+    {ecli, ".*", 
+      {git, "https://github.com/stwind/ecli.git", {branch, "develop"}}}
+  ]}.
+```
+
+And include `ecli` and `getopt` in your escript:
+
+```erlang
+{escript_incl_apps, [ecli, getopt]}.
+```
+
+## Features:
 
 * [Subcommand](#subcommand)
 * Output Formatting
 
-## Subcommand
+### Subcommand
 
 Instead of having a bunch of standalone escript file, it is always helpful to have a unified command line interface to a collection of commands. Just like [npm](https://npmjs.org/) or [vagrant](http://vagrantup.com). Ecli makes this easy.
 
-### Requirements 
+#### Requirements 
 
 Ecli supposes that your subcommnds are something like this:
 
@@ -24,7 +41,7 @@ SCRIPT [command …] [<arg>] [<option>]
 That is a command that has a script name `SCRIPT` followed by one or more `command`, then argument `arg`, and finally some `option`s. The order of `comamnd`, `arg` and `option` can not be arbitrary, in order to make parsing more easier.
 
 
-### Usage
+#### Usage
 
 Just call `ecli:start/2` in the escript entry function `main/1`, providing the command-line argumets `Args` and a subcommand spec.
 
@@ -42,7 +59,7 @@ spec() ->
 	%% describe below.
 ```
 
-### Command Specification
+#### Command Specification
 
 Take [ectl](https://github.com/stwind/ectl) for example, given the following commands:
 
@@ -85,25 +102,17 @@ Now let's look closer to the `commands`, here is the spec of command option:
 
 ```erlang
 -type spec() :: [option()].
-
 -type option() :: 
         {script, string()} |
         {vsn, string()} |
         {config_file, string()} |
         {commands, [command()]}.
-
 -type command() :: cmd_collection() | cmd_spec().
-
 -type cmd_collection() :: {cmd_name(), [command()]}.
-
 -type cmd_name() :: string().
-
 -type cmd_spec() :: {cmd_name(), [cmd_arg()], cmd_fun(), [cmd_opt()]}.
-
 -type cmd_arg() :: atom() | '...'.
-
 -type cmd_fun() :: {module(), atom()} | module().
-
 -type cmd_opt() :: getopt:option_spec().
 ```
 
