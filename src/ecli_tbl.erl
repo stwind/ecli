@@ -27,13 +27,15 @@
 -define(dup(N, C), lists:duplicate(N, C)).
 -define(pad(N), ?dup(N, $\s)).
 
+-define(VALID_ALIGN(A), A == left orelse A == right orelse A == center).
+
 -define(VALID_COL(Col), 
-        is_tuple(Col),
-        tuple_size(Col) == 4,
-        is_atom(element(1, Col)),
-        is_integer(element(2, Col)),
-        element(2, Col) >= 2, %% minimum column width: 2 
-        is_integer(element(3, Col)),
+        is_tuple(Col) andalso
+        tuple_size(Col) == 4 andalso
+        (?VALID_ALIGN(element(1, Col))) andalso
+        is_integer(element(2, Col)) andalso
+        element(2, Col) >= 2 andalso %% minimum column width: 2 
+        is_integer(element(3, Col)) andalso
         is_integer(element(4, Col))).
 
 -type head() :: atom() | binary().
@@ -42,7 +44,7 @@
                   {align(), width()} | 
                   {align(), width(), pad_left(), pad_right()}.
 -type align() :: left | right | center.
--type width() :: integer().
+-type width() :: integer() | auto.
 -type pad_left() :: integer().
 -type pad_right() :: integer().
 
@@ -66,7 +68,7 @@ print(Rows, Opts) ->
     Table3 = align_rows(Table2),
     Table4 = init_columns(Table3),
     Table5 = calc_width(Table4),
-    print_info(Table5),
+    %print_info(Table5),
     do_print(Table5).
 
 %% ===================================================================
@@ -118,7 +120,9 @@ init_column(I, #table{columns = Columns, rows = Rows}) ->
     init_col(Col, [lists:nth(I, Row) || Row <- Rows]).
 
 init_col(Align, Vals) when is_atom(Align) ->
-    {Align, calc_vals_width(Vals), 0, 0};
+    valid_col({Align, calc_vals_width(Vals), 0, 0});
+init_col({Align, auto}, Vals) ->
+    valid_col({Align, calc_vals_width(Vals), 0, 0});
 init_col({Align, Width}, _) ->
     valid_col({Align, Width, 0, 0});
 init_col(Col, _) ->
@@ -149,11 +153,11 @@ calc_width(#table{columns = Columns} = Table) ->
 %% Drawing functions
 %% ===================================================================
 
-print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
-    ?PRINT("columns: ~p~n", [Columns]),
-    ?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
-    ?PRINT("width: ~p~n", [Width]),
-    [?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
+%print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
+    %?PRINT("columns: ~p~n", [Columns]),
+    %?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
+    %?PRINT("width: ~p~n", [Width]),
+    %[?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
 
 do_print(#table{rows = Rows} = T) ->
     print_line_top(T),
