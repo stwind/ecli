@@ -25,7 +25,7 @@ And include `ecli` and `getopt` in your escript:
 ## Features:
 
 * [Subcommand](#subcommand)
-* Output Formatting
+* [Output Formatting](#output)
 
 ### Subcommand
 
@@ -199,4 +199,47 @@ And finally running `ectl -v` will shows the script version provided:
 
 ```bash
 ectl 0.1.0
+```
+
+### Outputting
+
+Most of times it would be nice to display the results in table format for better visualizaiton, or json format which could be consumed by programs like [jq](http://stedolan.github.io/jq/) at another end of pipe. 
+
+Ecli has builtin support for `table` format output, you can easily achieve this by adding an `output` option to your command.
+
+First include the `ecli.hrl` lib to your module:
+
+```erlang
+-include_lib("ecli/include/ecli.hrl").
+```
+
+then add `?OTP_OUTPUT` to your subcommand spec, here is example from `ectl ping`:
+
+```erlang
+{"ping", [node, '...'], ectl_ping,
+      [
+       {cookie, $c, "cookie", string, "Erlang cookie to use"},
+       ?OPT_OUTPUT
+      ]}
+```
+
+Now your command will have a `output` option: 
+
+```bash
+$ ./ectl ping
+Usage: ectl ping <node> [...] [options]
+
+  -c, --cookie  Erlang cookie to use
+  -o, --output  output format: table|json|plain [default: plain]
+```
+
+In your command handler function, use the `ecli:output/3` to output the results, here again is example from `ectl ping`:
+
+```bash
+$ ./ectl ping my_node@127.0.0.1 -c my_cookie -o table
+┌──────────────────────┬────────┐
+│ node                 │ result │
+├──────────────────────┼────────┤
+│ yunio_core@127.0.0.1 │ pang   │
+└──────────────────────┴────────┘
 ```
