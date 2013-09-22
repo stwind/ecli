@@ -25,7 +25,7 @@ And include `ecli` and `getopt` in your escript:
 ## Features:
 
 * [Subcommand](#subcommand)
-* [Output Formatting](#output)
+* [Output Formatting](#outputting)
 
 ### Subcommand
 
