@@ -91,13 +91,13 @@ init_rows(Rows, Table) ->
     Table#table{rows = Rows1}.
 
 init_heads(#table{heads = [_|_] = Heads} = Table) ->
-    Table#table{heads = lists:usort([to_b(H) || H <- Heads])};
+    Table#table{heads = [to_b(H) || H <- Heads]};
 init_heads(#table{rows = Rows} = Table) ->
     Keys = lists:foldl(
              fun(Row, Acc) -> 
                      proplists:get_keys(Row) ++ Acc
              end, [], Rows),
-    Table#table{heads = lists:usort([to_b(H) || H <- Keys])}.
+    Table#table{heads = [to_b(H) || H <- Keys]}.
 
 align_rows(#table{heads = Heads, rows = Rows} = Table) ->
     Rows1 = [align_row(Row, Heads) || Row <- Rows],
@@ -154,7 +154,8 @@ calc_width(#table{columns = Columns} = Table) ->
 %% Drawing functions
 %% ===================================================================
 
-%print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
+%print_info(#table{rows = Rows, columns = Columns, width = Width, heads = Heads} = T) ->
+    %?PRINT("heads: ~p~n", [Heads]),
     %?PRINT("columns: ~p~n", [Columns]),
     %?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
     %?PRINT("width: ~p~n", [Width]),
