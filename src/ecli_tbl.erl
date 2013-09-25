@@ -55,7 +55,8 @@
           heads = [] :: [head()],
           truncate = [8230] :: string(), %% "…"
           rows = [],
-          style = line :: line | compact
+          style = line :: line | compact,
+          debug = false :: boolean()
          }).
 
 %% ===================================================================
@@ -69,7 +70,7 @@ print(Rows, Opts) ->
     Table3 = align_rows(Table2),
     Table4 = init_columns(Table3),
     Table5 = calc_width(Table4),
-    %print_info(Table5),
+    print_info(Table5),
     do_print(Table5).
 
 %% ===================================================================
@@ -157,12 +158,15 @@ calc_width(#table{columns = Columns} = T) ->
 %% Drawing functions
 %% ===================================================================
 
-%print_info(#table{rows = Rows, columns = Columns, width = Width, heads = Heads} = T) ->
-    %?PRINT("heads: ~p~n", [Heads]),
-    %?PRINT("columns: ~p~n", [Columns]),
-    %?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
-    %?PRINT("width: ~p~n", [Width]),
-    %[?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
+print_info(#table{rows = Rows, columns = Columns, debug = true,
+                  width = Width, heads = Heads} = T) ->
+    ?PRINT("heads: ~p~n", [Heads]),
+    ?PRINT("columns: ~p~n", [Columns]),
+    ?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
+    ?PRINT("width: ~p~n", [Width]),
+    [?PRINT("r: ~p ~n", [Row]) || Row <- Rows];
+print_info(_) ->
+    nop.
 
 do_print(#table{rows = Rows} = T) ->
     print_line_top(T),
