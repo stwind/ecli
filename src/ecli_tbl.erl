@@ -54,7 +54,8 @@
           columns = [] :: [column()],
           heads = [] :: [head()],
           truncate = [8230] :: string(), %% "…"
-          rows = []
+          rows = [],
+          style = line :: line | compact
          }).
 
 %% ===================================================================
@@ -63,7 +64,7 @@
 
 print(Rows, Opts) ->
     Table = init_opts(Opts, #table{rows = Rows}),
-    Table1 = init_rows(Rows, Table),
+    Table1 = init_rows(Table),
     Table2 = init_heads(Table1),
     Table3 = align_rows(Table2),
     Table4 = init_columns(Table3),
@@ -75,18 +76,20 @@ print(Rows, Opts) ->
 %% Private
 %% ===================================================================
 
-init_opts([{chars, Chars} | Rest], Table) ->
-    init_opts(Rest, Table#table{chars = Chars});
-init_opts([{columns, Columns} | Rest], Table) ->
-    init_opts(Rest, Table#table{columns = Columns});
-init_opts([{heads, Heads} | Rest], Table) ->
-    init_opts(Rest, Table#table{heads = Heads});
-init_opts([_ | Rest], Table) ->
-    init_opts(Rest, Table);
-init_opts([], Table) ->
-    Table.
+init_opts([{chars, Chars} | Rest], T) ->
+    init_opts(Rest, T#table{chars = Chars});
+init_opts([{columns, Columns} | Rest], T) ->
+    init_opts(Rest, T#table{columns = Columns});
+init_opts([{heads, Heads} | Rest], T) ->
+    init_opts(Rest, T#table{heads = Heads});
+init_opts([{style, Style} | Rest], T) ->
+    init_opts(Rest, T#table{style = Style});
+init_opts([_ | Rest], T) ->
+    init_opts(Rest, T);
+init_opts([], T) ->
+    T.
 
-init_rows(Rows, Table) ->
+init_rows(#table{rows = Rows} = Table) ->
     Rows1 = [[{to_b(K), V} || {K, V} <- Row] || Row <- Rows],
     Table#table{rows = Rows1}.
 
@@ -143,12 +146,12 @@ calc_vals_width(Vals) ->
 get_width(Val) ->
     length(to_l(Val)).
 
-calc_width(#table{columns = Columns} = Table) ->
+calc_width(#table{columns = Columns} = T) ->
     Width = lists:foldl(
               fun(Col, Acc) -> 
                       col_width(Col) + Acc 
               end, length(Columns) + 1, Columns),
-    Table#table{width = Width}.
+    T#table{width = Width}.
 
 %% ===================================================================
 %% Drawing functions
@@ -163,10 +166,8 @@ calc_width(#table{columns = Columns} = Table) ->
 
 do_print(#table{rows = Rows} = T) ->
     print_line_top(T),
-    print_line_break(),
     print_rows(Rows, T),
-    print_line_bottom(T),
-    print_line_break().
+    print_line_bottom(T).
 
 print_rows([Cells], T) ->
     print_cells(Cells, T),
@@ -175,18 +176,26 @@ print_rows([Cells | Rs], T) ->
     print_cells(Cells, T),
     print_line_break(),
     print_line_mid(T),
-    print_line_break(),
     print_rows(Rs, T).
 
 print_cells(Cells, #table{columns = Cols} = T) ->
     [print_cell(to_l(Cell), Col, T) || {Cell, Col} <- lists:zip(Cells, Cols)],
     ?PRINT("~ts",[c("right", T)]).
 
-print_line_top(T) -> print_line(line_chars(top, T), T).
+print_line_top(#table{style = line} = T) -> 
+    print_line(line_chars(top, T), T);
+print_line_top(#table{style = compact}) -> 
+    nop.
 
-print_line_mid(T) -> print_line(line_chars(middle, T), T).
+print_line_mid(#table{style = line} = T) -> 
+    print_line(line_chars(middle, T), T);
+print_line_mid(#table{style = compact}) -> 
+    nop.
 
-print_line_bottom(T) -> print_line(line_chars(bottom, T),T).
+print_line_bottom(#table{style = line} = T) -> 
+    print_line(line_chars(bottom, T),T);
+print_line_bottom(#table{style = compact}) -> 
+    nop.
 
 print_line_break() -> ?PRINT("~n").
 
@@ -198,7 +207,8 @@ line_chars(bottom, T) ->
     {c("bottom",T),c("bottom-left",T),c("bottom-right",T),c("bottom-mid",T)}.
 
 print_line(Chars, #table{width = Width} = T) ->
-    draw_line(Chars, {1, Width}, checkpoints(T)).
+    draw_line(Chars, {1, Width}, checkpoints(T)),
+    print_line_break().
 
 draw_line({_, Left, _, _} = Chars, {1, Width}, CheckPoints) ->
     ?PRINT("~ts", [Left]),
@@ -240,7 +250,10 @@ to_l(V) when is_atom(V) -> atom_to_list(V);
 to_l(V) when is_list(V) -> V;
 to_l(_) -> exit(badarg).
 
-c(C, #table{chars = Chars}) -> proplists:get_value(C, Chars).
+c(_, #table{style = compact}) -> 
+    "";
+c(C, #table{chars = Chars}) -> 
+    proplists:get_value(C, Chars).
 
 num_cols(#table{heads = Heads}) -> length(Heads).
 
