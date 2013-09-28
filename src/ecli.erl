@@ -10,6 +10,7 @@
 -export([halt_with/3]).
 
 -export([connect_node/2]).
+-export([each_node/2]).
 -export([wait_for/1]).
 -export([output/3]).
 
@@ -99,6 +100,18 @@ wait_for(Pid) ->
         {'DOWN', Mref, _, _, _} ->
             ok
     end.
+
+each_node(Fun, Nodes) ->
+    lists:map(
+      fun({Node, Cookie}) -> 
+              net_kernel:stop(),
+              case connect_node(Node, Cookie) of
+                  {ok, _} ->
+                      Fun({Node, Cookie}, pong);
+                  {error, _} ->
+                      Fun({Node, Cookie}, pang)
+              end
+      end, Nodes).
 
 output(Data, OutputOpts, Opts) ->
     case opt(output, Opts) of

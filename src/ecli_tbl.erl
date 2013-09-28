@@ -54,7 +54,9 @@
           columns = [] :: [column()],
           heads = [] :: [head()],
           truncate = [8230] :: string(), %% "…"
-          rows = []
+          rows = [],
+          compact = false :: boolean(),
+          debug = false :: boolean()
          }).
 
 %% ===================================================================
@@ -62,46 +64,48 @@
 %% ===================================================================
 
 print(Rows, Opts) ->
-    Table = init_opts(Opts, #table{rows = Rows}),
-    Table1 = init_rows(Rows, Table),
-    Table2 = init_heads(Table1),
-    Table3 = align_rows(Table2),
-    Table4 = init_columns(Table3),
-    Table5 = calc_width(Table4),
-    %print_info(Table5),
-    do_print(Table5).
+    do_print(init_opts(Opts, #table{rows = Rows})).
 
 %% ===================================================================
 %% Private
 %% ===================================================================
 
-init_opts([{chars, Chars} | Rest], Table) ->
-    init_opts(Rest, Table#table{chars = Chars});
-init_opts([{columns, Columns} | Rest], Table) ->
-    init_opts(Rest, Table#table{columns = Columns});
-init_opts([{heads, Heads} | Rest], Table) ->
-    init_opts(Rest, Table#table{heads = Heads});
-init_opts([_ | Rest], Table) ->
-    init_opts(Rest, Table);
-init_opts([], Table) ->
-    Table.
+init_opts([{chars, Chars} | Rest], T) ->
+    init_opts(Rest, T#table{chars = Chars});
+init_opts([{columns, Columns} | Rest], T) ->
+    init_opts(Rest, T#table{columns = Columns});
+init_opts([{heads, Heads} | Rest], T) ->
+    init_opts(Rest, T#table{heads = Heads});
+init_opts([debug | Rest], T) ->
+    init_opts(Rest, T#table{debug = true});
+init_opts([compact | Rest], T) ->
+    init_opts(Rest, T#table{compact = true});
+init_opts([_ | Rest], T) ->
+    init_opts(Rest, T);
+init_opts([], T) ->
+    init_rows(T).
 
-init_rows(Rows, Table) ->
+init_rows(#table{rows = [R | _] = Rows} = T) when is_list(R) -> 
     Rows1 = [[{to_b(K), V} || {K, V} <- Row] || Row <- Rows],
-    Table#table{rows = Rows1}.
+    init_heads(T#table{rows = Rows1});
+init_rows(#table{rows = [{_, _} | _] = Rows} = T) ->
+    Rows1 = [[K, V] || {K, V} <- Rows],
+    init_columns(T#table{rows = Rows1, 
+                         columns = [left,left], 
+                         heads = [dummy,dumy]}).
 
-init_heads(#table{heads = [_|_] = Heads} = Table) ->
-    Table#table{heads = lists:usort([to_b(H) || H <- Heads])};
-init_heads(#table{rows = Rows} = Table) ->
+init_heads(#table{heads = [_|_] = Heads} = T) ->
+    align_rows(T#table{heads = [to_b(H) || H <- Heads]});
+init_heads(#table{rows = Rows} = T) ->
     Keys = lists:foldl(
              fun(Row, Acc) -> 
                      proplists:get_keys(Row) ++ Acc
              end, [], Rows),
-    Table#table{heads = lists:usort([to_b(H) || H <- Keys])}.
+    align_rows(T#table{heads = lists:usort([to_b(H) || H <- Keys])}).
 
-align_rows(#table{heads = Heads, rows = Rows} = Table) ->
+align_rows(#table{heads = Heads, rows = Rows} = T) ->
     Rows1 = [align_row(Row, Heads) || Row <- Rows],
-    Table#table{rows = [[to_l(H) || H <- Heads] | Rows1]}.
+    init_columns(T#table{rows = [Heads | Rows1]}).
 
 align_row(Row, Heads) ->
     [proplists:get_value(Key, Row, "") || Key <- Heads].
@@ -111,7 +115,7 @@ init_columns(#table{columns = [], heads = Heads} = T) ->
 init_columns(#table{columns = Columns, heads = Heads} = T) 
   when length(Columns) == length(Heads) ->
     Columns1 = [init_column(I, T) || I <- lists:seq(1, num_cols(T))],
-    T#table{columns = Columns1};
+    calc_width(T#table{columns = Columns1});
 init_columns(_) ->
     throw({error, invalid_columns}).
 
@@ -143,51 +147,52 @@ calc_vals_width(Vals) ->
 get_width(Val) ->
     length(to_l(Val)).
 
-calc_width(#table{columns = Columns} = Table) ->
+calc_width(#table{columns = Columns} = T) ->
     Width = lists:foldl(
               fun(Col, Acc) -> 
                       col_width(Col) + Acc 
               end, length(Columns) + 1, Columns),
-    Table#table{width = Width}.
+    T#table{width = Width}.
 
 %% ===================================================================
 %% Drawing functions
 %% ===================================================================
 
-%print_info(#table{rows = Rows, columns = Columns, width = Width} = T) ->
-    %?PRINT("columns: ~p~n", [Columns]),
-    %?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
-    %?PRINT("width: ~p~n", [Width]),
-    %[?PRINT("r: ~p ~n", [Row]) || Row <- Rows].
+print_info(#table{rows = Rows, columns = Columns, debug = true,
+                  width = Width, heads = Heads} = T) ->
+    ?PRINT("heads: ~p~n", [Heads]),
+    ?PRINT("columns: ~p~n", [Columns]),
+    ?PRINT("checkpoints: ~p~n", [checkpoints(T)]),
+    ?PRINT("width: ~p~n", [Width]),
+    [?PRINT("r: ~p ~n", [Row]) || Row <- Rows];
+print_info(_) ->
+    nop.
 
 do_print(#table{rows = Rows} = T) ->
+    print_info(T),
     print_line_top(T),
-    print_line_break(),
     print_rows(Rows, T),
-    print_line_bottom(T),
-    print_line_break().
+    print_line_bottom(T).
 
 print_rows([Cells], T) ->
-    print_cells(Cells, T),
-    print_line_break();
+    print_cells(Cells, T);
 print_rows([Cells | Rs], T) ->
     print_cells(Cells, T),
-    print_line_break(),
     print_line_mid(T),
-    print_line_break(),
     print_rows(Rs, T).
 
 print_cells(Cells, #table{columns = Cols} = T) ->
     [print_cell(to_l(Cell), Col, T) || {Cell, Col} <- lists:zip(Cells, Cols)],
-    ?PRINT("~ts",[c("right", T)]).
+    ?PRINT("~ts~n",[c("right", T)]).
 
-print_line_top(T) -> print_line(line_chars(top, T), T).
+print_line_top(T) -> 
+    print_line(line_chars(top, T), T).
 
-print_line_mid(T) -> print_line(line_chars(middle, T), T).
+print_line_mid(T) -> 
+    print_line(line_chars(middle, T), T).
 
-print_line_bottom(T) -> print_line(line_chars(bottom, T),T).
-
-print_line_break() -> ?PRINT("~n").
+print_line_bottom(T) -> 
+    print_line(line_chars(bottom, T), T).
 
 line_chars(top, T) ->
     {c("top",T),c("top-left",T),c("top-right",T),c("top-mid",T)};
@@ -196,6 +201,8 @@ line_chars(middle, T) ->
 line_chars(bottom, T) ->
     {c("bottom",T),c("bottom-left",T),c("bottom-right",T),c("bottom-mid",T)}.
 
+print_line(_, #table{compact = true}) ->
+    nop;
 print_line(Chars, #table{width = Width} = T) ->
     draw_line(Chars, {1, Width}, checkpoints(T)).
 
@@ -203,12 +210,12 @@ draw_line({_, Left, _, _} = Chars, {1, Width}, CheckPoints) ->
     ?PRINT("~ts", [Left]),
     draw_line(Chars, {2, Width}, CheckPoints);
 draw_line({_, _, Right, _}, {Width, Width}, _)  ->
-    ?PRINT("~ts", [Right]);
-draw_line({Line, _, _, Inter} = Chars, {Now, Width}, CheckPoints) ->
-    case lists:member(Now, CheckPoints) of
-        true -> ?PRINT("~ts", [Inter]);
-        false -> ?PRINT("~ts", [Line])
-    end,
+    ?PRINT("~ts~n", [Right]);
+draw_line({_, _, _, Inter} = Chars, {Now, Width}, [Now | CheckPoints]) ->
+    ?PRINT("~ts", [Inter]),
+    draw_line(Chars, {Now + 1, Width}, CheckPoints);
+draw_line({Line, _, _, _} = Chars, {Now, Width}, CheckPoints) ->
+    ?PRINT("~ts", [Line]),
     draw_line(Chars, {Now + 1, Width}, CheckPoints).
 
 print_cell(Cell, Col, T) ->
@@ -239,7 +246,10 @@ to_l(V) when is_atom(V) -> atom_to_list(V);
 to_l(V) when is_list(V) -> V;
 to_l(_) -> exit(badarg).
 
-c(C, #table{chars = Chars}) -> proplists:get_value(C, Chars).
+c(_, #table{compact = true}) -> 
+    "";
+c(C, #table{chars = Chars}) -> 
+    proplists:get_value(C, Chars).
 
 num_cols(#table{heads = Heads}) -> length(Heads).
 

@@ -22,7 +22,7 @@ And include `ecli` and `getopt` in your escript:
 {escript_incl_apps, [ecli, getopt]}.
 ```
 
-## Features:
+## Features
 
 * [Subcommand](#subcommand)
 * [Output Formatting](#outputting)

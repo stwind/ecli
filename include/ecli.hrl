@@ -3,7 +3,7 @@
 
 -define(HALT(Fmt), ?HALT(Fmt, [])).
 -define(HALT(Fmt, Args), ?HALT(Fmt, Args, 1)).
--define(HALT(Fmt, Args, Code), halt_with(Fmt, Args, Code)).
+-define(HALT(Fmt, Args, Code), ecli:halt_with(Fmt, Args, Code)).
 
 -define(OPT_OUTPUT, 
         {output, $o, "output", {atom, plain}, "output format: table|json|plain"}).
