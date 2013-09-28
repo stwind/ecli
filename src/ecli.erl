@@ -2,6 +2,7 @@
 
 -export([start/2]).
 -export([binding/2]).
+-export([binding/3]).
 -export([opt/2]).
 -export([opt/3]).
 
@@ -9,8 +10,9 @@
 -export([halt_with/2]).
 -export([halt_with/3]).
 
--export([connect_node/2]).
--export([each_node/2]).
+-export([start_node/1]).
+-export([start_node/2]).
+-export([start_node_for/2]).
 -export([wait_for/1]).
 -export([output/3]).
 
@@ -67,6 +69,9 @@ start(Args, Spec) ->
 binding(Key, #args{bindings = Bindings}) ->
     val(Key, Bindings).
 
+binding(Key, #args{bindings = Bindings}, Default) ->
+    val(Key, Bindings, Default).
+
 opt(Key, Opts) ->
     opt(Key, Opts, undefined).
 
@@ -83,16 +88,19 @@ halt_with(String, Args, Code) ->
     ?PRINT(String, Args),
     halt(Code).
 
-connect_node(Node, Cookie) ->
-    {ThisNode, Mode} = append_node_suffix(to_string(Node), "_maint_"),
-    {ok, _} = net_kernel:start([ThisNode, Mode]),
-    erlang:set_cookie(node(), Cookie),
-    case net_adm:ping(Node) of
-        pong ->
-            {ok, node()};
-        pang ->
-            {error, pang}
-    end.
+start_node(Cookie) ->
+    {ok, Host} = inet:gethostname(),
+    Node = list_to_atom(lists:concat(["ectl_",os:getpid(),"@",Host])),
+    start_node(Node, Cookie).
+
+start_node(Node, Cookie) ->
+    {ok, _} = net_kernel:start([Node, node_mode(Node)]),
+    erlang:set_cookie(node(), Cookie).
+
+start_node_for(Node, Cookie) ->
+    net_kernel:stop(),
+    ThisNode = append_node_suffix(to_string(Node), "_maint_"),
+    start_node(ThisNode, Cookie).
 
 wait_for(Pid) ->
     Mref = erlang:monitor(process, Pid),
@@ -100,18 +108,6 @@ wait_for(Pid) ->
         {'DOWN', Mref, _, _, _} ->
             ok
     end.
-
-each_node(Fun, Nodes) ->
-    lists:map(
-      fun({Node, Cookie}) -> 
-              net_kernel:stop(),
-              case connect_node(Node, Cookie) of
-                  {ok, _} ->
-                      Fun({Node, Cookie}, pong);
-                  {error, _} ->
-                      Fun({Node, Cookie}, pang)
-              end
-      end, Nodes).
 
 output(Data, OutputOpts, Opts) ->
     case opt(output, Opts) of
@@ -372,9 +368,13 @@ consult_conf_file(File, Opts0) ->
 append_node_suffix(Name, Suffix) ->
     case string:tokens(Name, "@") of
         [Node, Host] ->
-            {list_to_atom(lists:concat([Node, Suffix, os:getpid(), "@", Host])), 
-             longnames};
+            list_to_atom(lists:concat([Node, Suffix, os:getpid(), "@", Host]));
         [Node] ->
-            {list_to_atom(lists:concat([Node, Suffix, os:getpid()])),
-             shortnames}
+            list_to_atom(lists:concat([Node, Suffix, os:getpid()]))
+    end.
+
+node_mode(Name) ->
+    case string:tokens(to_string(Name), "@") of
+        [_, _] -> longnames;
+        [_] -> shortnames
     end.
