@@ -14,7 +14,7 @@
 -export([start_node/2]).
 -export([start_node_for/2]).
 -export([wait_for/1]).
--export([output/3]).
+-export([tabulate/2]).
 
 -include("ecli.hrl").
 
@@ -109,13 +109,8 @@ wait_for(Pid) ->
             ok
     end.
 
-output(Data, OutputOpts, Opts) ->
-    case opt(output, Opts) of
-        table ->
-            ecli_tbl:print(Data, OutputOpts);
-        _ ->
-            ?PRINT("~p~n",[Data])
-    end.
+tabulate(Data, Opts) ->
+    ecli_tbl:print(Data, Opts).
 
 %% ===================================================================
 %% Public
